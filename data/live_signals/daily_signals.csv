@@ -1,0 +1,2 @@
+timestamp,generated_at,eth_close,predicted_24h_return,threshold,signal_fires,direction,pool_buy_fraction,pool_net_pressure,wallet_count,model_version
+2026-05-13T00:00:00,2026-05-13T02:44:21.143774,2281.21,2.8775033950805664,0.5,True,LONG,0.3034825870646766,-0.04511214271704662,201,v1_200wallet_baseline
