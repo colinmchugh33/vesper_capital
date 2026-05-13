@@ -1,0 +1,54 @@
+# =============================================================
+# Vesper Capital — .gitignore
+# =============================================================
+
+# ── Large data files (stay in blockchain_alpha/data/, outside repo) ──
+# These are referenced via BASE_DIR.parent — never committed
+data/balance_store_hourly_top200.csv
+data/hourly_block_map.csv
+
+# ── Model archive (local version history, not pushed to remote) ──
+# Current production model (live_model.pkl) IS tracked.
+# Archived/retrained versions are local only.
+data/live_signals/model_archive/
+
+# ── Notebook execution artifacts ──
+notebooks/executed_live_signal*.ipynb
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.pyo
+.ipynb_checkpoints/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Environment ──
+.env
+.venv/
+venv/
+env/
+
+# ── OS / Editor ──
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ── Logs (cron.log stays local) ──
+data/live_signals/cron.log
+data/live_signals/deploy_dryrun.log
+
+# =============================================================
+# Tracked (explicitly noted for clarity):
+#   data/live_signals/daily_signals.csv     ← running signal log
+#   data/live_signals/signal_YYYY-MM-DD.md  ← per-day signal files
+#   data/live_signals/live_model.pkl        ← current production model
+#   data/live_signals/feature_cols.pkl      ← matching feature list
+#   notebooks/live_signal_monitor.ipynb     ← notebook source
+#   notebooks/claude_refactor_core_utils.py ← pipeline utils
+# =============================================================
