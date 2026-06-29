@@ -62,6 +62,57 @@ def is_port_open(host: str, port: int, timeout: float = 1.0) -> bool:
 # 2. PRICE DATA (Yahoo Finance)
 # =============================================================================
 
+def load_eth_usd_binance(start: str, end: str, interval: str = '1h') -> pd.DataFrame:
+    """
+    Load hourly ETH/USD OHLCV from Binance public API.
+    Drop-in replacement for load_eth_usd_cryptocompare.
+    No API key required. Free and unlimited.
+    """
+    import requests
+    from datetime import datetime
+
+    start_ms = int(datetime.strptime(start, '%Y-%m-%d').timestamp() * 1000)
+    end_ms   = int(datetime.strptime(end,   '%Y-%m-%d').timestamp() * 1000) + 86400000
+
+    all_rows = []
+    cursor   = start_ms
+
+    while cursor < end_ms:
+        url = "https://api.binance.us/api/v3/klines"
+        params = {
+            'symbol':    'ETHUSDT',
+            'interval':  '1h',
+            'startTime': cursor,
+            'endTime':   min(cursor + 1000 * 3600 * 1000, end_ms),  # 1000 candles max
+            'limit':     1000,
+        }
+        resp = requests.get(url, params=params, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+
+        if not data:
+            break
+
+        for candle in data:
+            all_rows.append({
+                'date':   pd.Timestamp(candle[0], unit='ms').floor('h'),
+                'open':   float(candle[1]),
+                'high':   float(candle[2]),
+                'low':    float(candle[3]),
+                'close':  float(candle[4]),
+                'volume': float(candle[5]),
+            })
+
+        cursor = data[-1][0] + 3600000  # advance by 1 hour past last candle
+
+    df = (pd.DataFrame(all_rows)
+          .drop_duplicates(subset=['date'])
+          .sort_values('date')
+          .reset_index(drop=True))
+    return df
+
+
+# might warrant deprecation
 def load_eth_usd_cryptocompare(
     start: str = '2022-01-01',
     end: Optional[str] = None,
@@ -2120,17 +2171,20 @@ def fetch_balances_for_schedule(
 
     # Build a normalized 'date' column
     if np.issubdtype(bd[block_date_col].dtype, np.datetime64):
-        bd["date"] = pd.to_datetime(bd[block_date_col]).dt.normalize()
+        #bd["date"] = pd.to_datetime(bd[block_date_col]).dt.normalize()
+        bd["date"] = pd.to_datetime(bd[block_date_col]).dt.floor('h')
     else:
         # try to parse strings/ints to datetime
-        bd["date"] = pd.to_datetime(bd[block_date_col], errors="coerce").dt.normalize()
+        #bd["date"] = pd.to_datetime(bd[block_date_col], errors="coerce").dt.normalize()
+        bd["date"] = pd.to_datetime(bd[block_date_col], errors="coerce").dt.floor('h')
     if "block_number" not in bd.columns:
         raise ValueError("block_df must contain 'block_number'.")
 
     bd = bd.dropna(subset=["date"]).drop_duplicates(subset=["date"])
 
     # ----- normalize pairs -----
-    pairs["date"] = pd.to_datetime(pairs["date"]).dt.normalize()
+    #pairs["date"] = pd.to_datetime(pairs["date"]).dt.normalize()
+    pairs["date"] = pd.to_datetime(pairs["date"]).dt.floor('h')
     pairs["address"] = pairs["address"].astype(str).str.lower().str.strip()
 
     to_query = (
@@ -2157,7 +2211,8 @@ def fetch_balances_for_schedule(
     )
 
     fetched["address"] = fetched["address"].astype(str).str.lower().str.strip()
-    fetched["date"] = pd.to_datetime(fetched["date"]).dt.normalize()
+    #fetched["date"] = pd.to_datetime(fetched["date"]).dt.normalize()
+    fetched["date"] = pd.to_datetime(fetched["date"]).dt.floor('h')
     fetched = (fetched
                .drop_duplicates(subset=["address","date","block_number"])
                .sort_values(["address","date"])
@@ -2400,3 +2455,7 @@ def attach_truth_balances(
 
     # Only return rows where we have both batch & truth
     return work_df.dropna(subset=[batch_col, out_col])
+
+
+# At the bottom of core_utils.py, add an alias so existing notebooks don't break:
+load_eth_usd_cryptocompare = load_eth_usd_binance
