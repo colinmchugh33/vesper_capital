@@ -80,7 +80,7 @@ def load_eth_usd_binance(start: str, end: str, interval: str = '1h', symbol: str
     while cursor < end_ms:
         url = "https://api.binance.us/api/v3/klines"
         params = {
-            'symbol':    'ETHUSDT',
+            'symbol':    symbol,
             'interval':  '1h',
             'startTime': cursor,
             'endTime':   min(cursor + 1000 * 3600 * 1000, end_ms),  # 1000 candles max
