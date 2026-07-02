@@ -62,7 +62,7 @@ def is_port_open(host: str, port: int, timeout: float = 1.0) -> bool:
 # 2. PRICE DATA (Yahoo Finance)
 # =============================================================================
 
-def load_eth_usd_binance(start: str, end: str, interval: str = '1h') -> pd.DataFrame:
+def load_eth_usd_binance(start: str, end: str, interval: str = '1h', symbol: str = 'ETHUSDT') -> pd.DataFrame:
     """
     Load hourly ETH/USD OHLCV from Binance public API.
     Drop-in replacement for load_eth_usd_cryptocompare.
@@ -1990,7 +1990,9 @@ async def fetch_balances_batched_async(
     max_retries: int = 3,
     retry_backoff: float = 0.5,
     progress_every: int = 10,
-    label: str = "fetch"
+    label: str = "fetch",
+    token_contract: str = None,
+    token_decimals: int = 18
 ) -> pd.DataFrame:
     """
     Description:
@@ -2049,15 +2051,26 @@ async def fetch_balances_batched_async(
     # ---------------- PATCHED BATCH POST ----------------
     async def _post_batch(client: httpx.AsyncClient, block_num: int, addrs: List[str]) -> List[Tuple[str, int, Optional[int]]]:
         nonlocal done_batches
+        # REPLACE WITH:
         reqs = []
         for i, addr in enumerate(addrs):
             rid = f"{block_num}|{addr}|{i}"
-            reqs.append({
-                "jsonrpc": "2.0",
-                "id": rid,
-                "method": "eth_getBalance",
-                "params": [addr, hex(block_num)]
-            })
+            if token_contract:
+                selector = "0x70a08231"
+                padded   = addr[2:].lower().zfill(64)
+                reqs.append({
+                    "jsonrpc": "2.0",
+                    "id":      rid,
+                    "method":  "eth_call",
+                    "params":  [{"to": token_contract, "data": selector + padded}, hex(block_num)]
+                })
+            else:
+                reqs.append({
+                    "jsonrpc": "2.0",
+                    "id":      rid,
+                    "method":  "eth_getBalance",
+                    "params":  [addr, hex(block_num)]
+                })
 
         for attempt in range(max_retries + 1):
             await bucket.take(1)
@@ -2142,7 +2155,9 @@ def fetch_balances_for_schedule(
     retry_backoff: float = 0.5,
     progress_every: int = 10,
     label: str = "balances",
-    block_date_col: str = "date"   # <— NEW
+    block_date_col: str = "date",  # <— NEW
+    token_contract: str = None,    # ERC-20: pass contract address; None = ETH native
+    token_decimals: int = 18,      # ERC-20: token decimal places
 ) -> pd.DataFrame:
     # Extract [address,date]
     if isinstance(schedule, dict):
@@ -2207,7 +2222,9 @@ def fetch_balances_for_schedule(
         max_retries=max_retries,
         retry_backoff=retry_backoff,
         progress_every=progress_every,
-        label=label
+        label=label,
+        token_contract=token_contract,
+        token_decimals=token_decimals
     )
 
     fetched["address"] = fetched["address"].astype(str).str.lower().str.strip()
